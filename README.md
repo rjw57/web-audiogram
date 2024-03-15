@@ -1,4 +1,7 @@
-# Web Audio Experiments
+# WebAudio Experiments
+
+This is a little experiment in generating a video with an audiogram-like visualisation of sound
+entirely using the WebAudio and WebCodec APIs.
 
 ## Running
 
