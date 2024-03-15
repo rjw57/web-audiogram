@@ -2213,6 +2213,11 @@
   dependencies:
     "@types/node" "*"
 
+"@types/dom-webcodecs@^0.1.11", "@types/dom-webcodecs@^0.1.4", "@types/dom-webcodecs@^0.1.6":
+  version "0.1.11"
+  resolved "https://registry.yarnpkg.com/@types/dom-webcodecs/-/dom-webcodecs-0.1.11.tgz#2e36e5cc71789551f107e2fe15d956845fa19567"
+  integrity sha512-yPEZ3z7EohrmOxbk/QTAa0yonMFkNkjnVXqbGb7D4rMr+F1dGQ8ZUFxXkyLLJuiICPejZ0AZE9Rrk9wUCczx4A==
+
 "@types/eslint-scope@^3.7.3":
   version "3.7.7"
   resolved "https://registry.yarnpkg.com/@types/eslint-scope/-/eslint-scope-3.7.7.tgz#3108bd5f18b0cdb277c867b3dd449c9ed7079ac5"
@@ -2357,6 +2362,11 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-16.18.89.tgz#264d1b6358c458f89f4e374f2210b58cf130fbab"
   integrity sha512-QlrE8QI5z62nfnkiUZysUsAaxWaTMoGqFVcB3PvK1WxJ0c699bacErV4Fabe9Hki6ZnaHalgzihLbTl2d34XfQ==
 
+"@types/offscreencanvas@^2019.7.3":
+  version "2019.7.3"
+  resolved "https://registry.yarnpkg.com/@types/offscreencanvas/-/offscreencanvas-2019.7.3.tgz#90267db13f64d6e9ccb5ae3eac92786a7c77a516"
+  integrity sha512-ieXiYmgSRXUDeOntE1InxjWyvEelZGP63M+cGuquuRLuIKKT1osnkXjxev9B7d1nXSug5vpunx+gNlbVxMlC9A==
+
 "@types/parse-json@^4.0.0":
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/@types/parse-json/-/parse-json-4.0.2.tgz#5950e50960793055845e956c427fc2b0d70c5239"
@@ -2479,6 +2489,11 @@
   version "2.0.7"
   resolved "https://registry.yarnpkg.com/@types/trusted-types/-/trusted-types-2.0.7.tgz#baccb07a970b91707df3a3e8ba6896c57ead2d11"
   integrity sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==
+
+"@types/wicg-file-system-access@^2020.9.5":
+  version "2020.9.8"
+  resolved "https://registry.yarnpkg.com/@types/wicg-file-system-access/-/wicg-file-system-access-2020.9.8.tgz#a8b739854ccb74b8048ef607d3701e9d506830e7"
+  integrity sha512-ggMz8nOygG7d/stpH40WVaNvBwuyYLnrg5Mbyf6bmsj/8+gb6Ei4ZZ9/4PNpcPNTT8th9Q8sM8wYmWGjMWLX/A==
 
 "@types/ws@^8.5.5":
   version "8.5.10"
@@ -7094,6 +7109,14 @@ mkdirp@~0.5.1:
   dependencies:
     minimist "^1.2.6"
 
+mp4-muxer@^3.0.5:
+  version "3.0.5"
+  resolved "https://registry.yarnpkg.com/mp4-muxer/-/mp4-muxer-3.0.5.tgz#441156c01cdb58b5a65a8d56909f16c2d9738472"
+  integrity sha512-CQBb6c14/Kv/h6etTOB/9phx5F4yshC7Mh5A/N+JVVMnESLdWdwIGEMUKk0ZrhzDWiQXLAag4MboYqBM7UxYVw==
+  dependencies:
+    "@types/dom-webcodecs" "^0.1.6"
+    "@types/wicg-file-system-access" "^2020.9.5"
+
 ms@2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.0.0.tgz#5608aeadfc00be6c2901df5f9861788de0d597c8"
@@ -9897,6 +9920,14 @@ webidl-conversions@^6.1.0:
   version "6.1.0"
   resolved "https://registry.yarnpkg.com/webidl-conversions/-/webidl-conversions-6.1.0.tgz#9111b4d7ea80acd40f5270d666621afa78b69514"
   integrity sha512-qBIvFLGiBpLjfwmYAaHPXsn+ho5xZnGvyGvsarywGNc8VyQJUMHJ8OBKGGrPER0okBeMDaan4mNBlgBROxuI8w==
+
+webm-muxer@^4.0.1:
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/webm-muxer/-/webm-muxer-4.0.1.tgz#08927fdca3de92986e5a4e2884fdb73aa2804f98"
+  integrity sha512-qFMWhY9A+nYDGUIxoUT0EmZ2Z3Ls+5jP4zlEYPpppZRUHFFU70Hk2udfPxwdB4xiYnBDiDX8g1IfHXRsn0AwGw==
+  dependencies:
+    "@types/dom-webcodecs" "^0.1.4"
+    "@types/wicg-file-system-access" "^2020.9.5"
 
 webpack-dev-middleware@^5.3.1:
   version "5.3.3"
