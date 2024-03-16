@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -15,6 +15,17 @@ const GenerateAudiogram = () => {
   const [barColor, setBarColor] = useState("#ff0000");
   const [status, setStatus] = useState<Status>();
   const [encodedMediaBuffer, setEncodedMediaBuffer] = useState<ArrayBuffer>();
+  const [encodedMediaURL, setEncodedMediaURL] = useState<string>();
+
+  useEffect(() => {
+    if (!encodedMediaBuffer) {
+      setEncodedMediaURL(undefined);
+      return;
+    }
+    const blob = new Blob([encodedMediaBuffer]);
+    setEncodedMediaURL(URL.createObjectURL(blob));
+  }, [encodedMediaBuffer]);
+
   const width = 640,
     height = 320;
 
@@ -32,15 +43,6 @@ const GenerateAudiogram = () => {
         }),
       );
     })();
-
-  const videoRefCallback = (videoEl: HTMLVideoElement | null) => {
-    if (!encodedMediaBuffer || !videoEl) {
-      return;
-    }
-    const blob = new Blob([encodedMediaBuffer]);
-    videoEl.src = URL.createObjectURL(blob);
-    videoEl.play();
-  };
 
   const isEncoding = status && status.state !== "completed";
   const progressPercentage = status?.progressPercentage;
@@ -91,7 +93,7 @@ const GenerateAudiogram = () => {
             value={progressPercentage}
           />
         )}
-        {encodedMediaBuffer && (
+        {encodedMediaURL && (
           <>
             <video
               style={{
@@ -102,18 +104,28 @@ const GenerateAudiogram = () => {
                 aspectRatio: width / height,
               }}
               controls
-              ref={videoRefCallback}
+              autoPlay
+              src={encodedMediaURL}
               width={width}
               height={height}
             />
-            <Box sx={{ mt: 1 }}>
+            <Box sx={{ mt: 1 }} display="flex" gap={2}>
               <Button
+                sx={{ flexGrow: 1 }}
                 variant="outlined"
                 onClick={() => {
                   setEncodedMediaBuffer(undefined);
                 }}
               >
                 Clear
+              </Button>
+              <Button
+                sx={{ flexGrow: 1 }}
+                variant="contained"
+                download="audiogram.webm"
+                href={encodedMediaURL}
+              >
+                Download
               </Button>
             </Box>
           </>

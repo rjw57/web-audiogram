@@ -3,6 +3,8 @@
 This is a little experiment in generating a video with an audiogram-like visualisation of sound
 entirely using the WebAudio and WebCodec APIs.
 
+See a [demo hosted on GitHub pages](https://rjw57.github.io/web-audiogram).
+
 ## Running
 
 ```console
