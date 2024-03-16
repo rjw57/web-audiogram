@@ -1,0 +1,12 @@
+{
+  "files": {
+    "main.js": "/web-audiogram/static/js/main.19329db6.js",
+    "static/js/453.30ef4a27.chunk.js": "/web-audiogram/static/js/453.30ef4a27.chunk.js",
+    "index.html": "/web-audiogram/index.html",
+    "main.19329db6.js.map": "/web-audiogram/static/js/main.19329db6.js.map",
+    "453.30ef4a27.chunk.js.map": "/web-audiogram/static/js/453.30ef4a27.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.19329db6.js"
+  ]
+}
