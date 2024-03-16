@@ -6,7 +6,7 @@ import {
   DataStream,
 } from "mp4box";
 
-export const decodeFrames = async function*(
+export const decodeFrames = async function* (
   decoderConfig: VideoDecoderConfig,
   encodedVideoChunks: EncodedVideoChunk[],
 ) {

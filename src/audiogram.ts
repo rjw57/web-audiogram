@@ -1,18 +1,88 @@
 import { ArrayBufferTarget } from "webm-muxer";
 import { createEncodingContext } from "./encode";
+import { fetchAndDemuxVideo, decodeFrames } from "./decode";
 
-interface AudiogramOptions {
-  width: number;
-  height: number;
-  videoFrameRate: number;
-  nextBackgroundFrame?: () => Promise<Parameters<OffscreenCanvasRenderingContext2D["drawImage"]>[0]>;
+/**
+ * Wrapper around fetch() which decodes data fetched into an AudioBuffer.
+ */
+const fetchAndDecodeAudioData = async (
+  sampleRate: number,
+  ...args: Parameters<typeof fetch>
+) => {
+  const response = await fetch(...args);
+  if (!response.ok) {
+    throw new Error(`Error fetching audio data: ${response.statusText}`);
+  }
+  const buffer = await response.arrayBuffer();
+  return new Promise<AudioBuffer>((resolve, reject) =>
+    new OfflineAudioContext(1, 1, sampleRate).decodeAudioData(
+      buffer,
+      resolve,
+      reject,
+    ),
+  );
+};
+
+export interface Status {
+  state: "fetching" | "encoding" | "completed";
+  progressPercentage?: number;
 }
 
-export const renderAudiogram = async (
-  audioBuffer: AudioBuffer,
-  options: AudiogramOptions,
-) => {
-  const { width, height, videoFrameRate, nextBackgroundFrame } = { ...options };
+export interface RenderAudiogramOptions {
+  audioUrl: string;
+  audioSampleRate?: number;
+  backgroundVideoUrl: string;
+  width: number;
+  height: number;
+  videoFrameRate?: number;
+  onStatus?: (status: Status) => void;
+  barFillStyle?: string;
+}
+
+const RENDER_AUDIOGRAM_DEFAULTS = {
+  audioSampleRate: 44100,
+  videoFrameRate: 30,
+  onStatus: () => {},
+  barFillStyle: "#ff000",
+};
+
+export const renderAudiogram = async (options: RenderAudiogramOptions) => {
+  const {
+    audioUrl,
+    audioSampleRate,
+    backgroundVideoUrl,
+    width,
+    height,
+    videoFrameRate,
+    onStatus,
+    barFillStyle,
+  } = {
+    ...RENDER_AUDIOGRAM_DEFAULTS,
+    ...options,
+  };
+
+  // Fetch audio and background video data.
+  onStatus({ state: "fetching" });
+  const [decodedAudioBuffer, { decoderConfig, encodedVideoChunks }] =
+    await Promise.all([
+      fetchAndDecodeAudioData(audioSampleRate, audioUrl),
+      fetchAndDemuxVideo(backgroundVideoUrl),
+    ]);
+
+  const backgroundFrameIterator = (async function* () {
+    while (1) {
+      yield* decodeFrames(decoderConfig, encodedVideoChunks);
+    }
+  })();
+
+  const nextBackgroundFrame = async () => {
+    const { done, value } = await backgroundFrameIterator.next();
+    if (done) {
+      throw new Error("Error getting next background frame.");
+    }
+    return value;
+  };
+
   const xPadding = 4; // px
   const binXPadding = 4; // px
   const binWidth = 16; // px
@@ -30,32 +100,36 @@ export const renderAudiogram = async (
       framerate: videoFrameRate,
     },
     audio: {
-      sampleRate: audioBuffer.sampleRate,
-      numberOfChannels: audioBuffer.numberOfChannels,
+      sampleRate: decodedAudioBuffer.sampleRate,
+      numberOfChannels: decodedAudioBuffer.numberOfChannels,
     },
   });
 
   const audioSamplesPerFrame = Math.floor(
-    audioBuffer.sampleRate / videoFrameRate,
+    decodedAudioBuffer.sampleRate / videoFrameRate,
   );
   let audioSampleOffset = 0;
 
   const audioChannelSamples = new Float32Array(audioSamplesPerFrame);
   const audioDataArray = new Float32Array(
-    audioSamplesPerFrame * audioBuffer.numberOfChannels,
+    audioSamplesPerFrame * decodedAudioBuffer.numberOfChannels,
   );
   const binXOffset = Math.floor(
     (width - (binWidth + binXPadding * 2) * binsPerFrame) * 0.5,
   );
 
   const audiogramData = await generateAudiogramData(
-    audioBuffer,
+    decodedAudioBuffer,
     videoFrameRate,
     binsPerFrame,
   );
   let frameIdx = 0;
   for (const frameData of audiogramData) {
     const timestamp = frameIdx * (1e6 / videoFrameRate);
+    onStatus({
+      state: "encoding",
+      progressPercentage: (1e-4 * timestamp) / decodedAudioBuffer.duration,
+    });
     frameIdx++;
 
     const canvas = new OffscreenCanvas(width, height);
@@ -64,7 +138,7 @@ export const renderAudiogram = async (
       throw new Error("Could not create off-screen canvas.");
     }
 
-    if(!nextBackgroundFrame) {
+    if (!nextBackgroundFrame) {
       canvasCtx.fillStyle = "green";
       canvasCtx.fillRect(0, 0, width, height);
     } else {
@@ -73,7 +147,7 @@ export const renderAudiogram = async (
     }
 
     frameData.forEach((binHeight, binIdx) => {
-      canvasCtx.fillStyle = "red";
+      canvasCtx.fillStyle = barFillStyle;
       canvasCtx.fillRect(
         binXOffset + binIdx * (binWidth + binXPadding * 2) + binXPadding,
         height * (0.5 - 0.3 * binHeight) - 1,
@@ -86,8 +160,12 @@ export const renderAudiogram = async (
     videoEncoder.encode(frame);
     frame.close();
 
-    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-      audioBuffer.copyFromChannel(
+    for (
+      let channel = 0;
+      channel < decodedAudioBuffer.numberOfChannels;
+      channel++
+    ) {
+      decodedAudioBuffer.copyFromChannel(
         audioChannelSamples,
         channel,
         audioSampleOffset,
@@ -98,9 +176,9 @@ export const renderAudiogram = async (
 
     const audioData = new AudioData({
       format: "f32-planar",
-      sampleRate: audioBuffer.sampleRate,
+      sampleRate: decodedAudioBuffer.sampleRate,
       numberOfFrames: audioSamplesPerFrame,
-      numberOfChannels: audioBuffer.numberOfChannels,
+      numberOfChannels: decodedAudioBuffer.numberOfChannels,
       timestamp,
       data: audioDataArray,
     });
@@ -111,6 +189,7 @@ export const renderAudiogram = async (
   await audioEncoder.flush();
   muxer.finalize();
 
+  onStatus({ state: "completed" });
   const { buffer } = muxer.target;
   return buffer;
 };

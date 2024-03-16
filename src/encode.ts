@@ -30,9 +30,12 @@ interface EncodingContext<T extends Target> {
 
 export const createEncodingContext = <T extends Target>(
   target: T,
-  options: EncodingOptions
+  options: EncodingOptions,
 ): EncodingContext<T> => {
-  const { video: { width, height, framerate }, audio: { numberOfChannels, sampleRate } } = options;
+  const {
+    video: { width, height, framerate },
+    audio: { numberOfChannels, sampleRate },
+  } = options;
   const muxer = new Muxer({
     target,
     video: {

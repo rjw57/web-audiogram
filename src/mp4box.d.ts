@@ -94,7 +94,11 @@ declare module "mp4box" {
 
   export var DataStream: {
     BIG_ENDIAN: boolean;
-    new(arrayBuffer?: ArrayBuffer, offset: number, endian: boolean): DataStream;
+    new (
+      arrayBuffer?: ArrayBuffer,
+      offset: number,
+      endian: boolean,
+    ): DataStream;
     buffer: ArrayBuffer;
   };
 }

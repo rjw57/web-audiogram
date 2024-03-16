@@ -1,92 +1,48 @@
-import { useRef } from "react";
+import { useMemo } from "react";
 
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider } from "@mui/material/styles";
+
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
+import Container from "@mui/material/Container";
+import Link from "@mui/material/Link";
+import Typography from "@mui/material/Typography";
 
-import { renderAudiogram } from "./audiogram";
-import { fetchAndDemuxVideo, decodeFrames } from "./decode";
-
-const DEFAULT_SAMPLE_RATE = 44100;
-
-/**
- * Wrapper around fetch() which decodes data fetched into an AudioBuffer.
- */
-const fetchAndDecodeAudioData = async (...args: Parameters<typeof fetch>) => {
-  const response = await fetch(...args);
-  if (!response.ok) {
-    throw new Error(`Error fetching audio data: ${response.statusText}`);
-  }
-  const buffer = await response.arrayBuffer();
-  return new Promise<AudioBuffer>((resolve, reject) =>
-    new OfflineAudioContext(1, 1, DEFAULT_SAMPLE_RATE).decodeAudioData(
-      buffer,
-      resolve,
-      reject,
-    ),
-  );
-};
-
-const doIt = async (videoEl: HTMLVideoElement) => {
-  // Fetch audio and background video data.
-  const [decodedAudioBuffer, { decoderConfig, encodedVideoChunks }] =
-    await Promise.all([
-      fetchAndDecodeAudioData("audio/nonaspr-cnuts-song-all.mp3"),
-      fetchAndDemuxVideo("background/yellow-motes.mp4"),
-    ]);
-
-  const backgroundFrameIterator = (async function* () {
-    while (1) {
-      yield* decodeFrames(decoderConfig, encodedVideoChunks);
-    }
-  })();
-
-  const nextBackgroundFrame = async () => {
-    const { done, value } = await backgroundFrameIterator.next();
-    if (done) {
-      throw new Error("Error getting next background frame.");
-    }
-    return value;
-  };
-
-  const encodedMediaBuffer = await renderAudiogram(decodedAudioBuffer, {
-    width: videoEl.width,
-    height: videoEl.height,
-    videoFrameRate: 30,
-    nextBackgroundFrame,
-  });
-
-  const blob = new Blob([encodedMediaBuffer]);
-  videoEl.src = URL.createObjectURL(blob);
-  videoEl.play();
-};
+import createTheme from "./theme";
+import GenerateAudiogram from "./GenerateAudiogram";
 
 const App = () => {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
+  const supportsWebCodecs = "VideoEncoder" in window;
+  const theme = useMemo(() => createTheme(prefersDarkMode), [prefersDarkMode]);
+
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
-          WebAudio Experiments
-        </Typography>
-        <Typography variant="body1" component="p" sx={{ mb: 2 }}>
-          Chrome only for the moment, sorry :(.
-        </Typography>
-        <Button
-          variant="contained"
-          size="large"
-          onClick={() => {
-            videoRef.current && doIt(videoRef.current);
-          }}
-        >
-          Load audio
-        </Button>
-        <p>
-          <video controls ref={videoRef} width={640} height={320} />
-        </p>
-      </Box>
-    </Container>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Container maxWidth="sm">
+        <Box sx={{ my: 4 }}>
+          {supportsWebCodecs ? (
+            <GenerateAudiogram />
+          ) : (
+            <Box sx={{ textAlign: "center" }}>
+              <Typography variant="body1" component="p" sx={{ mb: 2 }}>
+                <strong>
+                  Sorry, your browser does not yet support the WebCodecs API.
+                </strong>
+              </Typography>
+              <Typography variant="body1" component="p">
+                See{" "}
+                <Link href="https://caniuse.com/webcodecs">
+                  a list of supported browsers
+                </Link>{" "}
+                on caniuse.com.
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      </Container>
+    </ThemeProvider>
   );
 };
 
