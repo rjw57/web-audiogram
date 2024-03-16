@@ -14,6 +14,7 @@ interface EncodingOptions {
   video: {
     width: number;
     height: number;
+    framerate: number;
   };
   audio: {
     numberOfChannels: number;
@@ -31,7 +32,7 @@ export const createEncodingContext = <T extends Target>(
   target: T,
   options: EncodingOptions
 ): EncodingContext<T> => {
-  const { video: { width, height }, audio: { numberOfChannels, sampleRate } } = options;
+  const { video: { width, height, framerate }, audio: { numberOfChannels, sampleRate } } = options;
   const muxer = new Muxer({
     target,
     video: {
@@ -56,7 +57,8 @@ export const createEncodingContext = <T extends Target>(
     codec: "vp8",
     width,
     height,
-    bitrate: 10e6,
+    framerate,
+    bitrate: 1e6,
   });
 
   const audioEncoder = new AudioEncoder({

@@ -1,7 +1,49 @@
-import { createFile, MP4File, MP4ArrayBuffer, MP4VideoTrack } from "mp4box";
+import {
+  createFile,
+  MP4File,
+  MP4ArrayBuffer,
+  MP4VideoTrack,
+  DataStream,
+} from "mp4box";
+
+export const decodeFrames = async function*(
+  decoderConfig: VideoDecoderConfig,
+  encodedVideoChunks: EncodedVideoChunk[],
+) {
+  const generatedFrames: OffscreenCanvas[] = [];
+  const videoDecoder = new VideoDecoder({
+    output: (frame) => {
+      const canvas = new OffscreenCanvas(frame.codedWidth, frame.codedHeight);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Unable to create offscreen rendering context.");
+      }
+      ctx.drawImage(frame, 0, 0);
+      frame.close();
+      generatedFrames.push(canvas);
+    },
+    error: (e) => {
+      throw e;
+    },
+  });
+  videoDecoder.configure(decoderConfig);
+
+  for (const chunk of encodedVideoChunks) {
+    if (chunk.type === "key") {
+      await videoDecoder.flush();
+      yield* generatedFrames;
+      generatedFrames.length = 0;
+    }
+    videoDecoder.decode(chunk);
+  }
+  await videoDecoder.flush();
+  yield* generatedFrames;
+  videoDecoder.close();
+};
 
 export interface DemuxedVideo {
   encodedVideoChunks: EncodedVideoChunk[];
+  decoderConfig: VideoDecoderConfig;
   videoTrack: MP4VideoTrack;
 }
 
@@ -9,7 +51,7 @@ export const fetchAndDemuxVideo = async (
   ...args: Parameters<typeof fetch>
 ): Promise<DemuxedVideo> => {
   const encodedVideoChunks: EncodedVideoChunk[] = [];
-  let videoTrack: MP4VideoTrack | null = null;
+  const videoTracks: MP4VideoTrack[] = [];
 
   const response = await fetch(...args);
   if (!response.ok) {
@@ -25,17 +67,16 @@ export const fetchAndDemuxVideo = async (
     throw new Error(`Error demuxing background: ${e}`);
   };
   file.onReady = (info) => {
-    const videoTracks = info.tracks.filter((track) =>
-      Object.hasOwn(track, "video"),
-    ) as MP4VideoTrack[];
+    info.tracks
+      .filter((track) => Object.hasOwn(track, "video"))
+      .forEach((track) => videoTracks.push(track as MP4VideoTrack));
     if (videoTracks.length === 0) {
       throw new Error("Background video file has no video tracks.");
     }
-    videoTrack = videoTracks[0];
-    file.setExtractionOptions(videoTrack.id);
+    file.setExtractionOptions(videoTracks[0].id);
     file.start();
   };
-  file.onSamples = (_track_id, _user, samples) =>
+  file.onSamples = (_track_id, _user, samples) => {
     samples.forEach((sample) =>
       encodedVideoChunks.push(
         new EncodedVideoChunk({
@@ -46,18 +87,42 @@ export const fetchAndDemuxVideo = async (
         }),
       ),
     );
+  };
 
   const fileSink = new MP4FileSink(file);
   await response.body.pipeTo(
     new WritableStream(fileSink, { highWaterMark: 2 }),
   );
-  file.flush();
 
-  if (!videoTrack || encodedVideoChunks.length === 0) {
+  if (videoTracks.length === 0) {
     throw new Error("No video data was found in background video.");
   }
 
-  return { encodedVideoChunks, videoTrack };
+  const decoderConfig = {
+    // Browsers don't yet support parsing full vp8 codec (eg: `vp08.00.41.08`),
+    // they only support `vp8`.
+    codec: videoTracks[0].codec.startsWith("vp08")
+      ? "vp8"
+      : videoTracks[0].codec,
+    codedHeight: videoTracks[0].video.height,
+    codedWidth: videoTracks[0].video.width,
+    description: getDescription(file, videoTracks[0].id),
+  };
+
+  return { encodedVideoChunks, decoderConfig, videoTrack: videoTracks[0] };
+};
+
+const getDescription = (file: MP4File, track_id: number) => {
+  const track = (file as any).getTrackById(track_id);
+  for (const entry of track.mdia.minf.stbl.stsd.entries) {
+    const box = entry.avcC || entry.hvcC || entry.vpcC || entry.av1C;
+    if (box) {
+      const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
+      box.write(stream);
+      return new Uint8Array(stream.buffer, 8); // Remove the box header.
+    }
+  }
+  throw new Error("avcC, hvcC, vpcC, or av1C box not found");
 };
 
 // Wraps an MP4Box File as a WritableStream underlying sink.

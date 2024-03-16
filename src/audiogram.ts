@@ -5,13 +5,14 @@ interface AudiogramOptions {
   width: number;
   height: number;
   videoFrameRate: number;
+  nextBackgroundFrame?: () => Promise<Parameters<OffscreenCanvasRenderingContext2D["drawImage"]>[0]>;
 }
 
 export const renderAudiogram = async (
   audioBuffer: AudioBuffer,
   options: AudiogramOptions,
 ) => {
-  const { width, height, videoFrameRate } = { ...options };
+  const { width, height, videoFrameRate, nextBackgroundFrame } = { ...options };
   const xPadding = 4; // px
   const binXPadding = 4; // px
   const binWidth = 16; // px
@@ -26,6 +27,7 @@ export const renderAudiogram = async (
     video: {
       width,
       height,
+      framerate: videoFrameRate,
     },
     audio: {
       sampleRate: audioBuffer.sampleRate,
@@ -61,8 +63,15 @@ export const renderAudiogram = async (
     if (canvasCtx === null) {
       throw new Error("Could not create off-screen canvas.");
     }
-    canvasCtx.fillStyle = "green";
-    canvasCtx.fillRect(0, 0, width, height);
+
+    if(!nextBackgroundFrame) {
+      canvasCtx.fillStyle = "green";
+      canvasCtx.fillRect(0, 0, width, height);
+    } else {
+      const backgroundFrame = await nextBackgroundFrame();
+      canvasCtx.drawImage(backgroundFrame, 0, 0);
+    }
+
     frameData.forEach((binHeight, binIdx) => {
       canvasCtx.fillStyle = "red";
       canvasCtx.fillRect(

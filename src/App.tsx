@@ -6,7 +6,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 
 import { renderAudiogram } from "./audiogram";
-import { fetchAndDemuxVideo } from "./decode";
+import { fetchAndDemuxVideo, decodeFrames } from "./decode";
 
 const DEFAULT_SAMPLE_RATE = 44100;
 
@@ -30,22 +30,31 @@ const fetchAndDecodeAudioData = async (...args: Parameters<typeof fetch>) => {
 
 const doIt = async (videoEl: HTMLVideoElement) => {
   // Fetch audio and background video data.
-  const [decodedAudioBuffer, { encodedVideoChunks, videoTrack }] = await Promise.all([
-    fetchAndDecodeAudioData("audio/nonaspr-cnuts-song-all.mp3"),
-    fetchAndDemuxVideo("background/yellow-motes.mp4"),
-  ]);
+  const [decodedAudioBuffer, { decoderConfig, encodedVideoChunks }] =
+    await Promise.all([
+      fetchAndDecodeAudioData("audio/nonaspr-cnuts-song-all.mp3"),
+      fetchAndDemuxVideo("background/yellow-motes.mp4"),
+    ]);
 
-  if(encodedVideoChunks.length === 0) {
-    throw new Error("No background video was found.");
-  }
+  const backgroundFrameIterator = (async function* () {
+    while (1) {
+      yield* decodeFrames(decoderConfig, encodedVideoChunks);
+    }
+  })();
 
-  // console.log(videoTrack);
-  // console.log(encodedVideoChunks);
+  const nextBackgroundFrame = async () => {
+    const { done, value } = await backgroundFrameIterator.next();
+    if (done) {
+      throw new Error("Error getting next background frame.");
+    }
+    return value;
+  };
 
   const encodedMediaBuffer = await renderAudiogram(decodedAudioBuffer, {
     width: videoEl.width,
     height: videoEl.height,
     videoFrameRate: 30,
+    nextBackgroundFrame,
   });
 
   const blob = new Blob([encodedMediaBuffer]);
