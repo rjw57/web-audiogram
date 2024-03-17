@@ -1,11 +1,8 @@
 import { ArrayBufferTarget } from "webm-muxer";
 import { createEncodingContext } from "../encode";
-import {
-  demuxArrayBufferIntoEncodedChunks,
-  EncodedVideoTrack,
-} from "../mp4demux";
 
-import { fetchIntoArrayBuffer, fetchAndDecodeAudioData } from "./fetchWrappers";
+import { fetchAndDemuxVideo, fetchAndDecodeAudioData } from "./fetchWrappers";
+import { decodeVideo } from "./decodeVideo";
 
 export interface Status {
   state: "fetching" | "encoding" | "completed";
@@ -26,45 +23,8 @@ export interface RenderAudiogramOptions {
 const RENDER_AUDIOGRAM_OPTIONS_DEFAULTS = {
   audioSampleRate: 44100,
   videoFrameRate: 30,
-  onStatus: () => {},
+  onStatus: () => { },
   barFillStyle: "#ff000",
-};
-
-export const decodeFrames = async function* (
-  decoderConfig: VideoDecoderConfig,
-  encodedVideoChunks: EncodedVideoChunk[],
-) {
-  const generatedFrames: OffscreenCanvas[] = [];
-  const videoDecoder = new VideoDecoder({
-    output: (frame) => {
-      const canvas = new OffscreenCanvas(frame.codedWidth, frame.codedHeight);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        throw new Error("Unable to create offscreen rendering context.");
-      }
-      ctx.drawImage(frame, 0, 0);
-      frame.close();
-      generatedFrames.push(canvas);
-    },
-    error: (e) => {
-      throw e;
-    },
-  });
-  videoDecoder.configure(decoderConfig);
-
-  for (const chunk of encodedVideoChunks) {
-    if (chunk.type === "key") {
-      await videoDecoder.flush();
-    }
-    if (generatedFrames.length > 0) {
-      yield* generatedFrames;
-      generatedFrames.length = 0;
-    }
-    videoDecoder.decode(chunk);
-  }
-  await videoDecoder.flush();
-  yield* generatedFrames;
-  videoDecoder.close();
 };
 
 export const renderAudiogram = async (options: RenderAudiogramOptions) => {
@@ -85,22 +45,18 @@ export const renderAudiogram = async (options: RenderAudiogramOptions) => {
   // Fetch audio and background video data.
   onStatus({ state: "fetching" });
 
-  const [decodedAudioBuffer, encodedBackgroundVideo] = await Promise.all([
-    fetchAndDecodeAudioData(audioSampleRate, audioUrl),
-    fetchIntoArrayBuffer(backgroundVideoUrl),
-  ]);
+  const [decodedAudioBuffer, { decoderConfig, encodedChunks }] =
+    await Promise.all([
+      fetchAndDecodeAudioData(audioSampleRate, audioUrl),
+      fetchAndDemuxVideo(backgroundVideoUrl),
+    ]);
 
-  const videoTrack = (
-    await demuxArrayBufferIntoEncodedChunks(encodedBackgroundVideo)
-  ).filter((track) => track.type === "video")[0];
-  if (!videoTrack) {
-    throw new Error("Background video has no video tracks.");
-  }
-  const { decoderConfig, encodedChunks } = videoTrack as EncodedVideoTrack;
+  // Start encoding audiogram.
+  onStatus({ state: "encoding", progressPercentage: 0 });
 
-  const backgroundFrameIterator = (async function* () {
+  const backgroundFrameIterator = (async function*() {
     while (1) {
-      yield* decodeFrames(decoderConfig, encodedChunks);
+      yield* decodeVideo(decoderConfig, encodedChunks);
     }
   })();
 
@@ -173,6 +129,7 @@ export const renderAudiogram = async (options: RenderAudiogramOptions) => {
     } else {
       const backgroundFrame = await nextBackgroundFrame();
       canvasCtx.drawImage(backgroundFrame, 0, 0);
+      backgroundFrame.close();
     }
 
     frameData.forEach((binHeight, binIdx) => {
@@ -257,7 +214,7 @@ const generateAudiogramData = async (
   const resampledData = resampledAudioBuffer.getChannelData(0);
 
   // Coalesce samples into bins.
-  return (function* () {
+  return (function*() {
     for (let frameIdx = 0; frameIdx < videoFrameCount; frameIdx++) {
       yield Float32Array.from(new Array(binsPerFrame).keys(), (binIdx) =>
         resampledData
