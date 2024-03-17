@@ -1,4 +1,7 @@
-import { fetchIntoEncodedChunks, EncodedVideoTrack } from "../mp4demux";
+import {
+  demuxArrayBufferIntoEncodedChunks,
+  EncodedVideoTrack,
+} from "../mp4demux";
 
 /**
  * Wrapper around fetch() which decodes data fetched into an AudioBuffer.
@@ -23,26 +26,14 @@ export const fetchAndDecodeAudioData = async (
 };
 
 /**
- * Wrapper around fetch() which demultiplexes the first video track from an MP4 file.
+ * Wrapper around fetch() which returns an ArrayBuffer of the response.
  */
-export const fetchAndDemuxVideo = async (
+export const fetchIntoArrayBuffer = async (
   ...args: Parameters<typeof fetch>
-): Promise<EncodedVideoTrack> => {
+) => {
   const response = await fetch(...args);
   if (!response.ok) {
-    throw new Error(`Error fetching video data: ${response.statusText}`);
+    throw new Error(`Error fetching data: ${response.statusText}`);
   }
-  if (!response.body) {
-    throw new Error("Video response has no body.");
-  }
-
-  const encodedVideoTrack = (await fetchIntoEncodedChunks(response)).filter(
-    (encodedTrack) => encodedTrack.type === "video",
-  )[0];
-
-  if (!encodedVideoTrack) {
-    throw new Error("Media contains no video tracks.");
-  }
-
-  return encodedVideoTrack as EncodedVideoTrack;
+  return response.arrayBuffer();
 };

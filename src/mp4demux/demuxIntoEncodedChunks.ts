@@ -6,7 +6,7 @@ import {
   DataStream,
 } from "mp4box";
 
-import fetchAndDemuxMedia from "./fetchAndDemuxMedia";
+import demux, { AppendBuffersCallback } from "./demux";
 
 export interface EncodedVideoTrack {
   id: number;
@@ -24,14 +24,13 @@ export interface EncodedAudioTrack {
 
 export type EncodedTrack = EncodedVideoTrack | EncodedAudioTrack;
 
-/**
- * Stream a response from fetch() demultiplexing the result into tracks of encoded video and audio.
- */
-export const fetchIntoEncodedChunks = async (response: Response) => {
+export const demuxIntoEncodedChunks = async (
+  appendBuffers: AppendBuffersCallback,
+) => {
   const encodedTracks: EncodedTrack[] = [];
   const encodedTracksById = new Map<number, EncodedTrack>();
 
-  await fetchAndDemuxMedia(response, {
+  await demux(appendBuffers, {
     onInfo: (info, file) => {
       info.tracks.forEach((track) => {
         const encodedTrack = createEncodedTrack(file, track);
@@ -113,4 +112,4 @@ const getDescription = (file: ISOFile, track_id: number) => {
   throw new Error("avcC, hvcC, vpcC, or av1C box not found");
 };
 
-export default fetchIntoEncodedChunks;
+export default demuxIntoEncodedChunks;

@@ -1,26 +1,23 @@
 import { ISOFile, MP4Info, MP4Track, Sample, createFile } from "mp4box";
 
-import ISOFileSink from "./ISOFileSink";
-
-export interface FetchAndDemuxMediaOptions {
+export interface DemuxOptions {
   onInfo?: (info: MP4Info, file: ISOFile) => void;
   onSamples?: (track: MP4Track, samples: Sample[], file: ISOFile) => void;
 }
 
-const FETCH_AND_DEMUX_MEDIA_OPTIONS_DEFAULTS = {
+export type AppendBuffersCallback = (file: ISOFile) => Promise<any>;
+
+const DEMUX_OPTIONS_DEFAULTS = {
   onInfo: () => {},
   onSamples: () => {},
 };
 
-/**
- * Given a response from a call to fetch(), stream and demux all tracks.
- */
-export const fetchAndDemuxMedia = async (
-  response: Response,
-  options?: FetchAndDemuxMediaOptions,
+export const demux = async (
+  appendBuffers: AppendBuffersCallback,
+  options?: DemuxOptions,
 ) => {
   const { onInfo, onSamples } = {
-    ...FETCH_AND_DEMUX_MEDIA_OPTIONS_DEFAULTS,
+    ...DEMUX_OPTIONS_DEFAULTS,
     ...options,
   };
   const file = createFile();
@@ -47,13 +44,9 @@ export const fetchAndDemuxMedia = async (
     onSamples(track, samples, file);
   };
 
-  if (response.body) {
-    await response.body.pipeTo(
-      new WritableStream(new ISOFileSink(file), { highWaterMark: 2 }),
-    );
-  }
+  await appendBuffers(file);
 
   return file;
 };
 
-export default fetchAndDemuxMedia;
+export default demux;

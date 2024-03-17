@@ -1,7 +1,11 @@
 import { ArrayBufferTarget } from "webm-muxer";
 import { createEncodingContext } from "../encode";
+import {
+  demuxArrayBufferIntoEncodedChunks,
+  EncodedVideoTrack,
+} from "../mp4demux";
 
-import { fetchAndDecodeAudioData, fetchAndDemuxVideo } from "./fetchWrappers";
+import { fetchIntoArrayBuffer, fetchAndDecodeAudioData } from "./fetchWrappers";
 
 export interface Status {
   state: "fetching" | "encoding" | "completed";
@@ -81,11 +85,18 @@ export const renderAudiogram = async (options: RenderAudiogramOptions) => {
   // Fetch audio and background video data.
   onStatus({ state: "fetching" });
 
-  const [decodedAudioBuffer, { decoderConfig, encodedChunks }] =
-    await Promise.all([
-      fetchAndDecodeAudioData(audioSampleRate, audioUrl),
-      fetchAndDemuxVideo(backgroundVideoUrl),
-    ]);
+  const [decodedAudioBuffer, encodedBackgroundVideo] = await Promise.all([
+    fetchAndDecodeAudioData(audioSampleRate, audioUrl),
+    fetchIntoArrayBuffer(backgroundVideoUrl),
+  ]);
+
+  const videoTrack = (
+    await demuxArrayBufferIntoEncodedChunks(encodedBackgroundVideo)
+  ).filter((track) => track.type === "video")[0];
+  if (!videoTrack) {
+    throw new Error("Background video has no video tracks.");
+  }
+  const { decoderConfig, encodedChunks } = videoTrack as EncodedVideoTrack;
 
   const backgroundFrameIterator = (async function* () {
     while (1) {

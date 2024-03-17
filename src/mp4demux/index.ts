@@ -1,2 +1,2 @@
-export * from "./fetchAndDemuxMedia";
-export * from "./fetchIntoEncodedChunks";
+export * from "./demuxIntoEncodedChunks";
+export * from "./demuxHelpers";
