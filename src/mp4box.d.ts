@@ -1884,7 +1884,7 @@ declare module "mp4box" {
 
   export function MPEG4DescriptorParser(): any;
 
-  export namespace BoxParser { }
+  export namespace BoxParser {}
 
   export namespace Log {
     export const LOG_LEVEL_ERROR = 4;

@@ -1,5 +1,3 @@
-import { demuxResponseIntoEncodedChunks, EncodedVideoTrack } from "../mp4demux";
-
 /**
  * Wrapper around fetch() which decodes data fetched into an AudioBuffer.
  */
@@ -33,22 +31,4 @@ export const fetchIntoArrayBuffer = async (
     throw new Error(`Error fetching data: ${response.statusText}`);
   }
   return response.arrayBuffer();
-};
-
-/**
- * Wrapper around fetch() which returns an EncodedVideoTrack for the first video track of a media
- * file.
- */
-export const fetchAndDemuxVideo = async (...args: Parameters<typeof fetch>) => {
-  const response = await fetch(...args);
-  if (!response.ok) {
-    throw new Error(`Error fetching data: ${response.statusText}`);
-  }
-  const videoTrack = (await demuxResponseIntoEncodedChunks(response)).filter(
-    (track) => track.type === "video",
-  )[0];
-  if (!videoTrack) {
-    throw new Error("Media has no video tracks.");
-  }
-  return videoTrack as EncodedVideoTrack;
 };
