@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Container from "@mui/material/Container";
 import LinearProgress from "@mui/material/LinearProgress";
-import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 
 import { MuiColorInput } from "mui-color-input";
@@ -82,7 +80,7 @@ const GenerateAudiogram = () => {
           Generate audiogram
         </Button>
       </Box>
-      <Box component="p" sx={{ mt: 2 }}>
+      <Box sx={{ mt: 2 }}>
         {isEncoding && (
           <LinearProgress
             variant={

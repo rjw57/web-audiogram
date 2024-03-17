@@ -1,27 +1,7 @@
 import { ArrayBufferTarget } from "webm-muxer";
-import { createEncodingContext } from "./encode";
-import { fetchAndDemuxVideo, decodeFrames } from "./decode";
+import { createEncodingContext } from "../encode";
 
-/**
- * Wrapper around fetch() which decodes data fetched into an AudioBuffer.
- */
-const fetchAndDecodeAudioData = async (
-  sampleRate: number,
-  ...args: Parameters<typeof fetch>
-) => {
-  const response = await fetch(...args);
-  if (!response.ok) {
-    throw new Error(`Error fetching audio data: ${response.statusText}`);
-  }
-  const buffer = await response.arrayBuffer();
-  return new Promise<AudioBuffer>((resolve, reject) =>
-    new OfflineAudioContext(1, 1, sampleRate).decodeAudioData(
-      buffer,
-      resolve,
-      reject,
-    ),
-  );
-};
+import { fetchAndDecodeAudioData, fetchAndDemuxVideo } from "./fetchWrappers";
 
 export interface Status {
   state: "fetching" | "encoding" | "completed";
@@ -39,11 +19,48 @@ export interface RenderAudiogramOptions {
   barFillStyle?: string;
 }
 
-const RENDER_AUDIOGRAM_DEFAULTS = {
+const RENDER_AUDIOGRAM_OPTIONS_DEFAULTS = {
   audioSampleRate: 44100,
   videoFrameRate: 30,
   onStatus: () => {},
   barFillStyle: "#ff000",
+};
+
+export const decodeFrames = async function* (
+  decoderConfig: VideoDecoderConfig,
+  encodedVideoChunks: EncodedVideoChunk[],
+) {
+  const generatedFrames: OffscreenCanvas[] = [];
+  const videoDecoder = new VideoDecoder({
+    output: (frame) => {
+      const canvas = new OffscreenCanvas(frame.codedWidth, frame.codedHeight);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Unable to create offscreen rendering context.");
+      }
+      ctx.drawImage(frame, 0, 0);
+      frame.close();
+      generatedFrames.push(canvas);
+    },
+    error: (e) => {
+      throw e;
+    },
+  });
+  videoDecoder.configure(decoderConfig);
+
+  for (const chunk of encodedVideoChunks) {
+    if (chunk.type === "key") {
+      await videoDecoder.flush();
+    }
+    if (generatedFrames.length > 0) {
+      yield* generatedFrames;
+      generatedFrames.length = 0;
+    }
+    videoDecoder.decode(chunk);
+  }
+  await videoDecoder.flush();
+  yield* generatedFrames;
+  videoDecoder.close();
 };
 
 export const renderAudiogram = async (options: RenderAudiogramOptions) => {
@@ -57,13 +74,14 @@ export const renderAudiogram = async (options: RenderAudiogramOptions) => {
     onStatus,
     barFillStyle,
   } = {
-    ...RENDER_AUDIOGRAM_DEFAULTS,
+    ...RENDER_AUDIOGRAM_OPTIONS_DEFAULTS,
     ...options,
   };
 
   // Fetch audio and background video data.
   onStatus({ state: "fetching" });
-  const [decodedAudioBuffer, { decoderConfig, encodedVideoChunks }] =
+
+  const [decodedAudioBuffer, { decoderConfig, encodedChunks }] =
     await Promise.all([
       fetchAndDecodeAudioData(audioSampleRate, audioUrl),
       fetchAndDemuxVideo(backgroundVideoUrl),
@@ -71,7 +89,7 @@ export const renderAudiogram = async (options: RenderAudiogramOptions) => {
 
   const backgroundFrameIterator = (async function* () {
     while (1) {
-      yield* decodeFrames(decoderConfig, encodedVideoChunks);
+      yield* decodeFrames(decoderConfig, encodedChunks);
     }
   })();
 
